@@ -10,9 +10,7 @@ import {
 	Vector2,
 	Camera,
 	Scene,
-	Observable,
-	Mesh,
-	Material
+	Observable
 } from "@babylonjs/core";
 import { ITileGeometryLoader, ITileLoader, ITileMaterialLoader, LoaderFactory, TileLoader } from "../loader/index2";
 import { ISource } from "../source/index2";
@@ -58,9 +56,21 @@ export class TileMap extends TransformNode {
 	public autoUpdate = true;
 	public updateInterval = 100;
 
+	public get scene() {
+		return this.getScene();
+	}
+
 	public readonly rootTile: Tile;
 	public readonly loader: ITileLoader;
 	public readonly _loader = new TileMapLoader();
+
+	private _receiveShadows = false;
+	public get receiveShadows(): boolean {
+		return this._receiveShadows;
+	}
+	public set receiveShadows(value: boolean) {
+		this._receiveShadows = value;
+	}
 
 	private _minLevel = 2;
 	public get minLevel() {
@@ -214,9 +224,11 @@ export class TileMap extends TransformNode {
 					LODThreshold: this.LODThreshold,
 				});
 				
-				if (this.rootTile._mesh) {
-					this.rootTile._mesh.receiveShadows = this.receiveShadows;
-				}
+				this.rootTile.traverse((tile) => {
+					if (tile instanceof Tile) {
+						tile.receiveShadows = this.receiveShadows;
+					}
+				});
 			} catch (e) {
 				console.error("Error on loading tile data.", e);
 			}
@@ -230,7 +242,9 @@ export class TileMap extends TransformNode {
 	}
 
 	public dispose() {
-		this.parent?.removeChild(this);
+		if (this.parent) {
+			this.parent.getChildren().splice(this.parent.getChildren().indexOf(this), 1);
+		}
 		this.reload();
 		super.dispose();
 	}
@@ -273,7 +287,8 @@ export class TileMap extends TransformNode {
 	}
 
 	public getLocalInfoFromScreen(camera: Camera, pointer: Vector2) {
-		return getLocalInfoFromScreen(camera, this, pointer);
+		const pointer3D = new Vector3(pointer.x, pointer.y, 0);
+		return getLocalInfoFromScreen(camera, this, pointer3D);
 	}
 
 	public get downloading() {

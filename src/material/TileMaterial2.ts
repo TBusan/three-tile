@@ -9,7 +9,7 @@ import { StandardMaterial, Texture, Scene } from "@babylonjs/core";
 /**
  * Tile material
  */
-export class TileMaterial2 extends StandardMaterial {
+export class TileMaterial extends StandardMaterial {
     constructor(name: string, scene: Scene) {
         super(name, scene);
         this.transparencyMode = 2; // ALPHATEST mode

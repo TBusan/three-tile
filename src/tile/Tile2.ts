@@ -72,6 +72,16 @@ export class Tile extends TransformNode {
 
 	private _showing = false;
 
+	public get receiveShadows(): boolean {
+		return this._mesh?.receiveShadows || false;
+	}
+
+	public set receiveShadows(value: boolean) {
+		if (this._mesh) {
+			this._mesh.receiveShadows = value;
+		}
+	}
+
 	/**
 	 * Gets the showing state of the tile.
 	 */

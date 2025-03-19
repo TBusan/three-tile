@@ -4,6 +4,8 @@
  *@date: 2023-04-05
  */
 
+import { Scene } from "@babylonjs/core";
+
 /** Project ID */
 export type ProjectionType = "3857" | "4326";
 /**
@@ -34,4 +36,6 @@ export interface ISource {
 	_getUrl(x: number, y: number, z: number): string | undefined;
 	/** User data */
 	userData: { [key: string]: any };
+	/** Scene reference */
+	scene?: Scene;
 }

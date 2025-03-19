@@ -4,7 +4,7 @@
  *@date: 2023-04-06
  */
 
-import { Texture, Scene } from "@babylonjs/core";
+import { Texture } from "@babylonjs/core";
 import { ISource } from "../source/index2";
 import { LoaderFactory } from "./LoaderFactory2";
 import { getSafeTileUrlAndBounds, getBoundsCoord } from "./util2";
@@ -20,6 +20,9 @@ export class TileTextureLoader2 {
 	 * @returns texture
 	 */
 	public async load(source: ISource, x: number, y: number, z: number): Promise<Texture> {
+		if (!source.scene) {
+			throw new Error("Scene is required for texture loading");
+		}
 		// 创建空纹理
 		const texture = new Texture("", source.scene);
 		texture.gammaSpace = true;
@@ -37,9 +40,23 @@ export class TileTextureLoader2 {
 		// if the tile level is greater than max level, clip the max level parent of this tile image
 		if (z > source.maxLevel) {
 			const subImage = getSubImageFromRect(image, clipBounds);
-			texture.updateSource(subImage);
+			const canvas = document.createElement('canvas');
+			canvas.width = subImage.width;
+			canvas.height = subImage.height;
+			const ctx = canvas.getContext('2d');
+			ctx?.drawImage(subImage, 0, 0);
+			const base64 = canvas.toDataURL();
+			const newTexture = await Texture.CreateFromBase64String("", base64, source.scene);
+			Object.assign(texture, newTexture);
 		} else {
-			texture.updateSource(image);
+			const canvas = document.createElement('canvas');
+			canvas.width = image.width;
+			canvas.height = image.height;
+			const ctx = canvas.getContext('2d');
+			ctx?.drawImage(image, 0, 0);
+			const base64 = canvas.toDataURL();
+			const newTexture = await Texture.CreateFromBase64String("", base64, source.scene);
+			Object.assign(texture, newTexture);
 		}
 
 		LoaderFactory.manager.parseEnd(url);
