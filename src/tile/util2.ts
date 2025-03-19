@@ -1,0 +1,117 @@
+/**
+ *@description: Tile uitls
+ *@author: 郭江峰
+ *@date: 2023-04-05
+ */
+
+import { Vector3 } from "@babylonjs/core";
+import { Tile } from "./Tile2";
+import { ITileLoader } from "../loader/index2";
+
+export enum LODAction {
+	none,
+	create,
+	remove,
+}
+
+const FACTOR = 1.02;
+
+// Get the distance of camera to tile
+export function getDistance(tile: Tile, cameraWorldPosition: Vector3) {
+	const tilePos = tile.position.clone();
+	tilePos.z = tile.maxZ;
+	Vector3.TransformCoordinatesToRef(tilePos, tile.getWorldMatrix(), tilePos);
+	return Vector3.Distance(cameraWorldPosition, tilePos);
+}
+
+export function getTileSize(tile: Tile) {
+	const scale = tile.scaling;
+	const worldMatrix = tile.getWorldMatrix();
+	const lt = Vector3.TransformCoordinates(new Vector3(-scale.x, -scale.y, 0), worldMatrix);
+	const rt = Vector3.TransformCoordinates(new Vector3(scale.x, scale.y, 0), worldMatrix);
+	return Vector3.Distance(lt, rt);
+}
+
+function getDistRatio(tile: Tile): number {
+	return (tile.distToCamera / tile.sizeInWorld) * 0.8;
+}
+
+/**
+ * Evaluate the Level of Detail (LOD) action
+ *
+ * @param tile The tile object
+ * @param minLevel The minimum level
+ * @param maxLevel The maximum level
+ * @param threshold The threshold value
+ * @returns The LOD action type
+ */
+export function LODEvaluate(tile: Tile, minLevel: number, maxLevel: number, threshold: number): LODAction {
+	// Get the tile's FOV
+	const distRatio = getDistRatio(tile);
+
+	if (tile.isLeaf) {
+		// Only leaf tiles can create child tiles
+		if (
+			tile.inFrustum &&
+			tile.z < maxLevel &&
+			(tile.z < minLevel || tile.showing) && // Create child tilee until parent tile has showed
+			(tile.z < minLevel || distRatio < threshold / FACTOR)
+		) {
+			return LODAction.create;
+		}
+	} else {
+		// Only Non-leaf tile can remove child tiles
+		if (tile.z >= minLevel && (tile.z > maxLevel || distRatio > threshold * FACTOR)) {
+			return LODAction.remove;
+		}
+	}
+
+	return LODAction.none;
+}
+
+/**
+ * Load the children tile from coordinate
+ * @param loader tile loader instance
+ * @param px parent tile x coordinate
+ * @param py parent tile y coordinate
+ * @param pz parent tile level
+ * @returns children tile array
+ */
+export function createChildren(loader: ITileLoader, px: number, py: number, pz: number): Tile[] {
+	const children: Tile[] = [];
+	const level = pz + 1;
+	const x = px * 2;
+	const z = 0;
+	const pos = 0.25;
+	// Two children at level 0 when 4326 projection
+	const isWGS = loader.imgSource[0].projectionID === "4326";
+	if (pz === 0 && isWGS) {
+		const y = py;
+		const scale = new Vector3(0.5, 1.0, 1.0);
+		const t1 = new Tile(x, y, level);
+		const t2 = new Tile(x, y, level);
+		t1.position = new Vector3(-pos, 0, z);
+		t1.scaling = scale;
+		t2.position = new Vector3(pos, 0, z);
+		t2.scaling = scale;
+		children.push(t1, t2);
+	} else {
+		const y = py * 2;
+		const scale = new Vector3(0.5, 0.5, 1.0);
+		const t1 = new Tile(x, y, level);
+		const t2 = new Tile(x + 1, y, level);
+		const t3 = new Tile(x, y + 1, level);
+		const t4 = new Tile(x + 1, y + 1, level);
+		t1.position = new Vector3(-pos, pos, z);
+		t1.scaling = scale;
+		t2.position = new Vector3(pos, pos, z);
+		t2.scaling = scale;
+		t3.position = new Vector3(-pos, -pos, z);
+		t3.scaling = scale;
+		t4.position = new Vector3(pos, -pos, z);
+		t4.scaling = scale;
+		children.push(t1, t2, t3, t4);
+	}
+
+	return children;
+}
