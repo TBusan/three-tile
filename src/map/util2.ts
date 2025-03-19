@@ -12,7 +12,8 @@
     DynamicTexture,
     StandardMaterial,
     MeshBuilder,
-    TransformNode
+    TransformNode,
+    Matrix
 } from "@babylonjs/core";
 import { Tile } from "../tile/index2";
 import { TileMap } from "./TileMap2";
@@ -68,7 +69,16 @@ export function getLocalInfoFromWorld(map: TileMap, worldPosition: Vector3) {
  * @returns ground info
  */
 export function getLocalInfoFromScreen(camera: Camera, map: TileMap, pointer: Vector3) {
-    const ray = camera.getForwardRay(pointer.x, pointer.y);
+    const origin = Vector3.Unproject(
+        new Vector3(pointer.x, pointer.y, 0),
+        1,
+        1,
+        Matrix.Identity(),
+        camera.getViewMatrix(),
+        camera.getProjectionMatrix()
+    );
+    const direction = origin.subtract(camera.position).normalize();
+    const ray = new Ray(camera.position, direction);
     return getLocalInfoFromRay(map, ray);
 }
 
@@ -77,25 +87,39 @@ export function attachEvent(map: TileMap) {
 
     const dispatchLoadingEvent = (type: string, payload?: any) => {
         const event = new CustomEvent(type, { detail: payload });
-        map.onEvent.notifyObservers(event);
+        if (type === "loading-start") {
+            map.events.onLoadingStart.notifyObservers(payload);
+        } else if (type === "loading-error") {
+            map.events.onLoadingError.notifyObservers(payload?.url);
+        } else if (type === "loading-complete") {
+            map.events.onLoadingComplete.notifyObservers();
+        } else if (type === "loading-progress") {
+            map.events.onLoadingProgress.notifyObservers(payload);
+        } else if (type === "ready") {
+            map.events.onReady.notifyObservers();
+        } else if (type === "tile-created") {
+            map.events.onTileCreated.notifyObservers(payload.tile);
+        } else if (type === "tile-loaded") {
+            map.events.onTileLoaded.notifyObservers(payload.tile);
+        }
     };
 
     // 添加瓦片加载事件
-    loadingManager.onStartTask = (taskName: string, loaded: number, total: number) => {
+    loadingManager.onStartObservable.add(({ taskName, loaded, total }) => {
         dispatchLoadingEvent("loading-start", { url: taskName, itemsLoaded: loaded, itemsTotal: total });
-    };
+    });
 
-    loadingManager.onTaskError = (taskName: string) => {
+    loadingManager.onErrorObservable.add((taskName) => {
         dispatchLoadingEvent("loading-error", { url: taskName });
-    };
+    });
 
-    loadingManager.onTaskComplete = () => {
+    loadingManager.onCompleteObservable.add(() => {
         dispatchLoadingEvent("loading-complete");
-    };
+    });
 
-    loadingManager.onProgress = (taskName: string, loaded: number, total: number) => {
+    loadingManager.onProgressObservable.add(({ taskName, loaded, total }) => {
         dispatchLoadingEvent("loading-progress", { url: taskName, itemsLoaded: loaded, itemsTotal: total });
-    };
+    });
 
     // 地图准备就绪事件
     map.rootTile.onTileReady.add(() => dispatchLoadingEvent("ready"));
@@ -130,20 +154,18 @@ export function goHome(map: TileMap, viewer: GLViewer) {
     window.addEventListener("keydown", (event) => {
         if (event.key === "F1") {
             event.preventDefault();
-            if (!map.getTransformNodeByName("boards")) {
+            if (!map.scene.getTransformNodeByName("boards")) {
                 const boards = createBillboards("three-tile");
                 boards.name = "boards";
                 boards.parent = map;
 
-                map.onEvent.add((evt) => {
-                    if (evt.type === "loading-complete") {
-                        const lonlat = new Vector3(108.94236, 34.2855, 0);
-                        const info = map.getLocalInfoFromGeo(lonlat);
-                        if (info) {
-                            boards.setEnabled(true);
-                            const pos = map.geo2map(info.location);
-                            boards.position = pos;
-                        }
+                map.events.onLoadingComplete.add(() => {
+                    const lonlat = new Vector3(108.94236, 34.2855, 0);
+                    const info = map.getLocalInfoFromGeo(lonlat);
+                    if (info) {
+                        boards.setEnabled(true);
+                        const pos = map.geo2map(info.location);
+                        boards.position = pos;
                     }
                 });
             }
@@ -157,7 +179,7 @@ export function goHome(map: TileMap, viewer: GLViewer) {
 
 export function drawBillboards(txt: string, size: number = 128) {
     const texture = new DynamicTexture("billboardTexture", size, undefined, true);
-    const ctx = texture.getContext();
+    const ctx = texture.getContext() as CanvasRenderingContext2D;
 
     ctx.fillStyle = "#000022";
     ctx.strokeStyle = "DarkGoldenrod";
@@ -172,7 +194,7 @@ export function drawBillboards(txt: string, size: number = 128) {
     // Draw rounded rectangle
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.roundRect(2, 2, size - 4, size / 2 - 8, 10);
+    ctx.rect(2, 2, size - 4, size / 2 - 8);
     ctx.fill();
     ctx.stroke();
 

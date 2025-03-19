@@ -4,7 +4,7 @@
  *@date: 2023-04-06
  */
 
-import { SceneLoader } from "@babylonjs/core";
+import { SceneLoader, Observable } from "@babylonjs/core";
 import { ISource } from "../source";
 import { ITileGeometryLoader, ITileMaterialLoader } from "./ITileLoaders2";
 import { author, version } from "..";
@@ -13,6 +13,10 @@ console.log(`====================babylon-tile V${version}=======================
 
 export class TileLoadingManager extends SceneLoader {
 	public onParseEnd?: (url: string) => void = undefined;
+	public readonly onStartObservable = new Observable<{taskName: string; loaded: number; total: number}>();
+	public readonly onErrorObservable = new Observable<string>();
+	public readonly onCompleteObservable = new Observable<void>();
+	public readonly onProgressObservable = new Observable<{taskName: string; loaded: number; total: number}>();
 
 	public parseEnd(url: string) {
 		this.onParseEnd && this.onParseEnd!(url);
