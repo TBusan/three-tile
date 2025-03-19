@@ -86,7 +86,7 @@ export function attachEvent(map: TileMap) {
     const loadingManager = map.loader.manager;
 
     const dispatchLoadingEvent = (type: string, payload?: any) => {
-        const event = new CustomEvent(type, { detail: payload });
+        // const event = new CustomEvent(type, { detail: payload });
         if (type === "loading-start") {
             map.events.onLoadingStart.notifyObservers(payload);
         } else if (type === "loading-error") {
